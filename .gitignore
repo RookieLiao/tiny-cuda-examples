@@ -55,3 +55,5 @@ dkms.conf
 __pycache__/
 
 .vscode
+.cursor
+
