@@ -57,3 +57,7 @@ __pycache__/
 .vscode
 .cursor
 
+**/.cache/clangd/
+build
+compile_commands.json
+*.egg-info/
