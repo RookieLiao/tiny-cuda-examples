@@ -1,3 +1,4 @@
+#include <torch/extension.h>
 #include <stdio.h>
 #include <float.h>
 
@@ -25,10 +26,21 @@ __global__ void softmax_kernel(float* input, float* output, size_t rows, size_t 
   }
 }
 
+void softmax_kernel_launcher(
+  torch::Tensor input,
+  torch::Tensor output
+) {
+  int rows = input.size(0);
+  int cols = input.size(1);
+  dim3 block_size(128);
+  dim3 grid_size(ceil(float(rows) / block_size.x));
+  softmax_kernel<<<grid_size, block_size>>>(input.data_ptr<float>(), output.data_ptr<float>(), rows, cols);
+}
+
 
 int main() {
-  int N = 128; // rows
-  int M = 2048; // cols
+  int N = 2048; // rows
+  int M = 8192; // cols
 
   int num_elements = N * M;
   float* input_h = (float*)malloc(num_elements * sizeof(float));
