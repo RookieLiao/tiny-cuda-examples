@@ -1,3 +1,8 @@
 CompileFlags:
   Remove:
     - "--generate-dependencies-with-compile"
+    - "--dependency-output"
+    - "--expt-relaxed-constexpr"
+    - "--compiler-options"
+    - "-gencode=arch=compute_89,code=compute_89"
+    - "-gencode=arch=compute_89,code=sm_89"
