@@ -9,9 +9,10 @@
 ---
 
 ### Project Progress by Day
-| Day   | Files & Summaries                                                                                                                                                                                                                          |
-|-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| day1  | **softmax.cu**: Softmax kernel implementation.<br>**softmax_binding.cpp**: Torch bindings for the softmax kernel.<br>**test_softmax.py**: Tests the softmax kernel against PyTorch. |
+| Day   | Files & Summaries         |
+|-------|---------------------------|
+| day1  | Naive Softmax kernel implementation - A basic CUDA kernel for computing softmax, with each thread handling one row |
+| day2  | Warp Softmax kernel implementation - Optimized version using warp-level primitives for better performance (~26x speedup) |
 
 
 #### How to load into PyTorch:
