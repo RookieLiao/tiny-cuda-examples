@@ -67,7 +67,6 @@ __global__ void warp_softmax_kernel(const float *input, float *output, size_t m,
     const int col_idx = pack_id * blockDim.x + threadIdx.x;
     if (col_idx < n) {
       row_y[col_idx] = expf(row_x[col_idx] - smem_val[threadIdx.y][0]) / smem_val[threadIdx.y][1];
-      // row_y[col_idx] = smem_val[threadIdx.y][0];
     }
   }
 }
