@@ -13,6 +13,7 @@
 |-------|---------------------------|
 | day1  | Naive Softmax kernel implementation - A basic CUDA kernel for computing softmax, with each thread handling one row |
 | day2  | Warp Softmax kernel implementation - Optimized version using warp-level primitives for better performance (~26x speedup) |
+| day3  | Dtype-aware Softmax kernel implementation - Use template to handle different data types (float16, bfloat16, float32) |
 
 
 #### How to load into PyTorch:

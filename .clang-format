@@ -1,0 +1,23 @@
+BasedOnStyle: LLVM
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterClass: true
+  AfterControlStatement: MultiLine
+  SplitEmptyRecord: false
+  SplitEmptyFunction: false
+AccessModifierOffset: -4
+AlignConsecutiveDeclarations: true
+AllowShortFunctionsOnASingleLine: Empty
+ColumnLimit: 80
+IndentWidth: 2
+UseTab: Never
+Standard: Latest
+PointerAlignment: Left
+NamespaceIndentation: None
+IndentCaseLabels: false
+BreakBeforeBinaryOperators: All
+BreakConstructorInitializers: AfterColon
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+BinPackArguments: false
