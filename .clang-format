@@ -12,7 +12,7 @@ AllowShortFunctionsOnASingleLine: Empty
 ColumnLimit: 80
 IndentWidth: 2
 UseTab: Never
-Standard: Latest
+Standard: Cpp17
 PointerAlignment: Left
 NamespaceIndentation: None
 IndentCaseLabels: false
