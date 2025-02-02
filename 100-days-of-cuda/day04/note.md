@@ -1,5 +1,3 @@
-
-
 Ideally, reducing among wrap is fastest. However, we need local registers to store inputs as each thread needs to store K/32*pack_size*sizeof(float) bytes.
 
 Q: Why need to store `K/32*pack_size*sizeof(float)` bytes?

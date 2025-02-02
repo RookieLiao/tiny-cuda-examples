@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <torch/extension.h>
 
 inline __device__ float warpReduceMax(float *val, int thread_group = 32) {
 #pragma unroll
@@ -93,7 +94,7 @@ __global__ void block_softmax_kernel(const float *input, float *output,
       local_sum[0] += expf(row_input[col_idx] - shared_val[0]);
     }
   }
-  blockReduceSum(local_sum, 1);
+  blockReduceSum(local_sum, 32);
 
   if (threadIdx.x == 0) {
     shared_val[1] = local_sum[0];
@@ -109,6 +110,30 @@ __global__ void block_softmax_kernel(const float *input, float *output,
   }
 }
 
+// New PyTorch launcher function
+void block_softmax_kernel_launcher(torch::Tensor input, torch::Tensor output) {
+  // Get tensor dimensions
+  const int rows = input.size(0);
+  const int cols = input.size(1);
+
+  // Ensure inputs are on GPU and contiguous
+  TORCH_CHECK(input.is_cuda(), "Input tensor must be on CUDA device");
+  TORCH_CHECK(output.is_cuda(), "Output tensor must be on CUDA device");
+  TORCH_CHECK(input.is_contiguous(), "Input tensor must be contiguous");
+  TORCH_CHECK(output.is_contiguous(), "Output tensor must be contiguous");
+  TORCH_CHECK(input.dim() == 2, "Input must be a 2D tensor");
+  TORCH_CHECK(output.dim() == 2, "Output must be a 2D tensor");
+
+  // Launch configuration
+  const dim3 grid_size(rows); // One block per row
+  const dim3 block_size(512); // 512 threads per block as in original
+
+  // Launch kernel
+  block_softmax_kernel<<<grid_size, block_size>>>(
+      input.data_ptr<float>(), output.data_ptr<float>(), rows, cols);
+}
+
+#ifdef STANDALONE_TEST
 int main() {
   int m = 1;
   int n = 1024;
@@ -140,3 +165,4 @@ int main() {
   }
   printf("\n");
 }
+#endif
