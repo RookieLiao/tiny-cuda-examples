@@ -1,12 +1,12 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
+#include <torch/extension.h>
 
 struct __align__(8) half4 {
-  __half x = 0;
-  __half y = 0;
-  __half z = 0;
-  __half w = 0;
+  __half x;
+  __half y;
+  __half z;
+  __half w;
 
   __device__ __host__ half4() {}
 
@@ -72,7 +72,7 @@ __global__ void vec_softmax_kernel(const half4 *input, half4 *output, int m,
 
   __shared__ float buf[block_size_y][2];
   if (threadIdx.x == 0) {
-    buf[threadIdx.y][0] = local_max[0];
+    buf[threadIdx.y][0] = __half2float(local_max[0]);
   }
   __syncthreads();
 
@@ -82,10 +82,10 @@ __global__ void vec_softmax_kernel(const half4 *input, half4 *output, int m,
     if (col_idx * cols_per_thread < n) {
       float max_val = buf[threadIdx.y][0];
       half4 x = row_x[col_idx];
-      local_sum[0] += expf(__half2float(x.x) - max_val) +
-                      expf(__half2float(x.y) - max_val) +
-                      expf(__half2float(x.z) - max_val) +
-                      expf(__half2float(x.w) - max_val);
+      local_sum[0] += (expf(__half2float(x.x) - max_val) +
+                       expf(__half2float(x.y) - max_val) +
+                       expf(__half2float(x.z) - max_val) +
+                       expf(__half2float(x.w) - max_val));
     }
   }
   warpReduceSum<1>(local_sum);
@@ -111,43 +111,20 @@ __global__ void vec_softmax_kernel(const half4 *input, half4 *output, int m,
   }
 }
 
-int main() {
+// Modified kernel launcher for PyTorch tensors
+void vec_softmax_kernel_launcher(torch::Tensor input, torch::Tensor output) {
+  int m = input.size(0);
+  int n = input.size(1);
+  assert(input.dtype() == torch::kHalf);
 
-  int m = 1;
-  int n = 128;
-
-  size_t mem_size = sizeof(half) * m * n;
-
-  half *input_h = (half *)malloc(mem_size);
-  half *output_h = (half *)malloc(mem_size);
-
-  // initialize input with random values
-  for (int i = 0; i < m * n; ++i) {
-    float val = rand() / (float)RAND_MAX;
-    input_h[i] = __float2half(val);
-  }
-
-  half4 *input_d;
-  half4 *output_d;
-  cudaMalloc(&input_d, mem_size);
-  cudaMalloc(&output_d, mem_size);
-
-  cudaMemcpy(input_d, input_h, mem_size, cudaMemcpyHostToDevice);
-
-  // 128 threads per block, parallel 4 rows, 1 warp per row
   const int block_size_y = 4;
   dim3 block_size(32, block_size_y);
   dim3 grid_size((m + block_size.y - 1) / block_size.y);
 
+  // Convert tensors to half4 pointers
+  half4 *input_ptr = reinterpret_cast<half4 *>(input.data_ptr<at::Half>());
+  half4 *output_ptr = reinterpret_cast<half4 *>(output.data_ptr<at::Half>());
+
   vec_softmax_kernel<block_size_y>
-      <<<grid_size, block_size>>>(input_d, output_d, m, n);
-
-  cudaMemcpy(output_h, output_d, mem_size, cudaMemcpyDeviceToHost);
-
-  for (int i = 0; i < m * n; ++i) {
-    printf("%f ", __half2float(output_h[i]));
-  }
-  printf("\n");
-
-  return 0;
+      <<<grid_size, block_size>>>(input_ptr, output_ptr, m, n);
 }
