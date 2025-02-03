@@ -42,10 +42,47 @@ inline __device__ float warpReduceSum(__half *val, int thread_group = 32) {
   }
 }
 
+// block_size.x=32, block_size.y=4 (32, 4)
+// grid_size.x = m / block_size.y (m / block_size.y,)
+template <int block_size_y>
 __global__ void vec_softmax_kernel(const half4 *input, half4 *output, int m,
                                    int n) {
+  const int cols_per_thread = 4;
+  int m_idx = blockIdx.x * blockDim.y + threadIdx.y;
+  if (m_idx >= m) {
+    return;
+  }
 
-  // int m_idx =
+  int row_offset = m_idx * n / cols_per_thread;
+  const half4 *row_x = input + row_offset;
+  half4 *row_y = output + row_offset;
+
+  __half local_max[1] = {__float2half(-INFINITY)};
+
+  for (int i = 0; i < n / cols_per_thread; i += blockDim.x) {
+    int col_idx = i + threadIdx.x;
+    if (col_idx * cols_per_thread < n) {
+      half4 x = row_x[col_idx];
+      local_max[0] =
+          __hmax(local_max[0], __hmax(x.x, __hmax(x.y, __hmax(x.z, x.w))));
+    }
+  }
+  warpReduceMax<1>(local_max);
+
+  __shared__ float buf[block_size_y][2];
+  if (threadIdx.x == 0) {
+    buf[threadIdx.y][0] = local_max[0];
+  }
+  __syncthreads();
+
+  for (int i = 0; i < n / cols_per_thread; i += blockDim.x) {
+    int col_idx = i + threadIdx.x;
+    if (col_idx * cols_per_thread < n) {
+      float max_val = buf[threadIdx.y][0];
+      row_y[col_idx] = {__float2half(max_val), __float2half(max_val),
+                        __float2half(max_val), __float2half(max_val)};
+    }
+  }
 }
 
 int main() {
@@ -72,10 +109,12 @@ int main() {
   cudaMemcpy(input_d, input_h, mem_size, cudaMemcpyHostToDevice);
 
   // 128 threads per block, parallel 4 rows, 1 warp per row
-  dim3 block_size(32, 4);
+  const int block_size_y = 4;
+  dim3 block_size(32, block_size_y);
   dim3 grid_size((m + block_size.y - 1) / block_size.y);
 
-  vec_softmax_kernel<<<grid_size, block_size>>>(input_d, output_d, m, n);
+  vec_softmax_kernel<block_size_y>
+      <<<grid_size, block_size>>>(input_d, output_d, m, n);
 
   cudaMemcpy(output_h, output_d, mem_size, cudaMemcpyDeviceToHost);
 
