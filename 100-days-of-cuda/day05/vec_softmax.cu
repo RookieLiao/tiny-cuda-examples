@@ -32,7 +32,7 @@ inline __device__ float warpReduceMax(__half *val, int thread_group = 32) {
 }
 
 template <int NUM>
-inline __device__ float warpReduceSum(__half *val, int thread_group = 32) {
+inline __device__ float warpReduceSum(float *val, int thread_group = 32) {
 #pragma unroll
   for (int i = 0; i < NUM; ++i) {
 #pragma unroll
@@ -40,6 +40,7 @@ inline __device__ float warpReduceSum(__half *val, int thread_group = 32) {
       val[i] += __shfl_xor_sync(0xFFFFFFFF, val[i], lane_mask, thread_group);
     }
   }
+  return 0.0f;
 }
 
 // block_size.x=32, block_size.y=4 (32, 4)
@@ -75,12 +76,37 @@ __global__ void vec_softmax_kernel(const half4 *input, half4 *output, int m,
   }
   __syncthreads();
 
+  float local_sum[1] = {0.0f};
   for (int i = 0; i < n / cols_per_thread; i += blockDim.x) {
     int col_idx = i + threadIdx.x;
     if (col_idx * cols_per_thread < n) {
       float max_val = buf[threadIdx.y][0];
-      row_y[col_idx] = {__float2half(max_val), __float2half(max_val),
-                        __float2half(max_val), __float2half(max_val)};
+      half4 x = row_x[col_idx];
+      local_sum[0] += expf(__half2float(x.x) - max_val) +
+                      expf(__half2float(x.y) - max_val) +
+                      expf(__half2float(x.z) - max_val) +
+                      expf(__half2float(x.w) - max_val);
+    }
+  }
+  warpReduceSum<1>(local_sum);
+
+  if (threadIdx.x == 0) {
+    buf[threadIdx.y][1] = local_sum[0];
+  }
+  __syncthreads();
+
+  for (int i = 0; i < n / cols_per_thread; i += blockDim.x) {
+    int col_idx = i + threadIdx.x;
+    if (col_idx * cols_per_thread < n) {
+      float max_val = buf[threadIdx.y][0];
+      float sum_val = buf[threadIdx.y][1];
+      half4 x = row_x[col_idx];
+      row_y[col_idx] = {
+          __float2half(expf(__half2float(x.x) - max_val) / sum_val),
+          __float2half(expf(__half2float(x.y) - max_val) / sum_val),
+          __float2half(expf(__half2float(x.z) - max_val) / sum_val),
+          __float2half(expf(__half2float(x.w) - max_val) / sum_val),
+      };
     }
   }
 }
