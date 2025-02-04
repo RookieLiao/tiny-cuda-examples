@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <torch/extension.h>
 
-#define TILE_SIZE 32
+#define TILE_SIZE 16
 
 __global__ void naiveMatmulKernel(const float *A, const float *B, float *C,
                                   int m, int n, int k) {

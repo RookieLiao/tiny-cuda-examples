@@ -74,5 +74,5 @@ def benchmark_matmul():
 
 
 if __name__ == "__main__":
-    # test_matmul()
+    test_matmul()
     benchmark_matmul()
