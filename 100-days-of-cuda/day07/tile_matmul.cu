@@ -1,7 +1,8 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <torch/extension.h>
 
-#define TILE_SIZE 16
+#define TILE_SIZE 32
 
 __global__ void naiveMatmulKernel(const float *A, const float *B, float *C,
                                   int m, int n, int k) {
@@ -55,10 +56,40 @@ __global__ void tiledMatmulKernel(const float *A, const float *B, float *C,
         sum += smem_A[ty][i] * smem_B[i][tx];
       }
     }
+    __syncthreads();
   }
+
   if ((col < n) && (row < m)) {
     C[row * n + col] = sum;
   }
+}
+
+void naive_matmul_launcher(torch::Tensor A, torch::Tensor B, torch::Tensor C) {
+
+  const int m = A.size(0);
+  const int k = A.size(1);
+  const int n = B.size(1);
+
+  dim3 block_size(TILE_SIZE, TILE_SIZE);
+  dim3 grid_size((n + block_size.x - 1) / block_size.x,
+                 (m + block_size.y - 1) / block_size.y);
+
+  naiveMatmulKernel<<<grid_size, block_size>>>(
+      A.data_ptr<float>(), B.data_ptr<float>(), C.data_ptr<float>(), m, n, k);
+}
+
+void tiled_matmul_launcher(torch::Tensor A, torch::Tensor B, torch::Tensor C) {
+
+  const int m = A.size(0);
+  const int k = A.size(1);
+  const int n = B.size(1);
+
+  dim3 block_size(TILE_SIZE, TILE_SIZE);
+  dim3 grid_size((n + TILE_SIZE - 1) / TILE_SIZE,
+                 (m + TILE_SIZE - 1) / TILE_SIZE);
+
+  tiledMatmulKernel<<<grid_size, block_size>>>(
+      A.data_ptr<float>(), B.data_ptr<float>(), C.data_ptr<float>(), m, n, k);
 }
 
 int main() {
