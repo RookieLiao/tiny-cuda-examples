@@ -37,28 +37,26 @@ __global__ void tiledMatmulKernel(const float *A, const float *B, float *C,
   __shared__ float smem_A[TILE_SIZE][TILE_SIZE];
   __shared__ float smem_B[TILE_SIZE][TILE_SIZE];
 
-  if ((col < n) && (row < m)) {
-    float sum = 0.f;
-    for (int stage = 0; stage < num_stages; ++stage) {
-      int k_offset = stage * TILE_SIZE;
-#pragma unroll
-      for (int kk = 0; kk < TILE_SIZE; ++kk) {
-        if (k_offset + kk < k) {
-          // load A/B to smem
-          smem_A[ty][kk] = A[row * k + kk + k_offset];
-          smem_B[kk][tx] = B[(kk + k_offset) * n + col];
-        }
-      }
-      __syncthreads();
+  float sum = 0.f;
+  for (int stage = 0; stage < num_stages; ++stage) {
+    int k_offset = stage * TILE_SIZE;
+
+    if (row < m && tx + k_offset < k) {
+      smem_A[ty][tx] = A[row * k + tx + k_offset];
+    }
+    if (col < n && ty + k_offset < k) {
+      smem_B[ty][tx] = B[(ty + k_offset) * n + col];
+    }
+    __syncthreads();
 
 #pragma unroll
-      for (int kk = 0; kk < TILE_SIZE; ++kk) {
-        if (k_offset + kk < k) {
-          sum += smem_A[ty][kk] * smem_B[kk][tx];
-        }
+    for (int i = 0; i < TILE_SIZE; ++i) {
+      if (k_offset + i < k) {
+        sum += smem_A[ty][i] * smem_B[i][tx];
       }
     }
-
+  }
+  if ((col < n) && (row < m)) {
     C[row * n + col] = sum;
   }
 }
