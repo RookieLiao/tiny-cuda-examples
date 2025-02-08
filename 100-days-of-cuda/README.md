@@ -16,6 +16,9 @@
 | day3  | Dtype-aware Softmax kernel implementation - Use template to handle different data types (float16, bfloat16, float32) |
 | day4  | Block Softmax kernel implementation - Optimized version for very large column size |
 | day5  | Vectorized Softmax kernel implementation - Use half4 to vector read and write |
+| day6  | Matrix Multiplication - Naive implementation |
+| day7  | Matrix Multiplication - Tiled implementation |
+| day8  | Matrix Multiplication - Profiling |
 
 
 #### How to load into PyTorch:
