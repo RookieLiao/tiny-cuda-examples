@@ -63,6 +63,59 @@ __global__ void tiledMatmulKernel(const float *A, const float *B, float *C,
   }
 }
 
+// Function: runCorrectnessCheck
+// Description: Launches the tiled and naive matrix multiplication kernels,
+//              copies the results back to the host, and then compares
+//              element-wise.
+void runCorrectnessCheck(const float *A_d, const float *B_d, float *C_d,
+                         float *C_d_naive, float *C_h, float *C_h_naive, int m,
+                         int n, int k, dim3 grid_size, dim3 block_size) {
+  // Launch tiled matmul kernel and copy result to host.
+  tiledMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d, m, n, k);
+  cudaMemcpy(C_h, C_d, m * n * sizeof(float), cudaMemcpyDeviceToHost);
+
+  // Launch naive matmul kernel and copy its result to host.
+  naiveMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d_naive, m, n, k);
+  cudaMemcpy(C_h_naive, C_d_naive, m * n * sizeof(float),
+             cudaMemcpyDeviceToHost);
+
+  // Compare the results element-wise.
+  for (int i = 0; i < m * n; i++) {
+    if (C_h[i] != C_h_naive[i]) {
+      printf("Error at %d: %f != %f\n", i, C_h[i], C_h_naive[i]);
+    }
+  }
+}
+
+// Function: profileTiledMatmulKernel
+// Description: Profiles the tiledMatmulKernel over a given number of iterations
+// using CUDA events.
+void profileMatmulKernel(const float *A_d, const float *B_d, float *C_d, int m,
+                         int n, int k, dim3 grid_size, dim3 block_size,
+                         int iterations) {
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+
+  // Record the start event.
+  cudaEventRecord(start, 0);
+  for (int i = 0; i < iterations; ++i) {
+    // tiledMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d, m, n, k);
+    naiveMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d, m, n, k);
+  }
+  // Record the stop event.
+  cudaEventRecord(stop, 0);
+  cudaEventSynchronize(stop);
+
+  float elapsed_time = 0.f;
+  cudaEventElapsedTime(&elapsed_time, start, stop);
+  printf("Tiled matmul average execution time: %f ms over %d iterations\n",
+         elapsed_time / iterations, iterations);
+
+  cudaEventDestroy(start);
+  cudaEventDestroy(stop);
+}
+
 int main() {
   int m = 1024;
   int n = 4096;
@@ -73,6 +126,7 @@ int main() {
   float *C_h = (float *)malloc(m * n * sizeof(float));
   float *C_h_naive = (float *)malloc(m * n * sizeof(float));
 
+  // Initialize matrices A_h and B_h.
   for (int i = 0; i < m * k; i++) {
     A_h[i] = rand() / (float)RAND_MAX;
   }
@@ -93,41 +147,22 @@ int main() {
   dim3 grid_size((n + TILE_SIZE - 1) / TILE_SIZE,
                  (m + TILE_SIZE - 1) / TILE_SIZE);
 
-  // tiledMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d, m, n, k);
-  // cudaMemcpy(C_h, C_d, m * n * sizeof(float), cudaMemcpyDeviceToHost);
-  // printf("Tiled matmul done\n");
+  // Perform the correctness check.
+  runCorrectnessCheck(A_d, B_d, C_d, C_d_naive, C_h, C_h_naive, m, n, k,
+                      grid_size, block_size);
 
-  // warmup
-  for (int i = 0; i < 10; ++i) {
-    naiveMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d_naive, m, n, k);
-  }
-  // profile
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-  float elapsed_time = 0.f;
-  cudaEventRecord(start, 0);
-  for (int i = 0; i < 10; ++i) {
-    tiledMatmulKernel<<<grid_size, block_size>>>(A_d, B_d, C_d, m, n, k);
-  }
-  cudaEventRecord(stop, 0);
-
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed_time, start, stop);
-  printf("Tiled matmul done in %f ms\n", elapsed_time / 10);
-  cudaMemcpy(C_h_naive, C_d_naive, m * n * sizeof(float),
-             cudaMemcpyDeviceToHost);
-
-  // for (int i = 0; i < m * n; i++) {
-  //   if (C_h[i] != C_h_naive[i]) {
-  //     printf("Error at %d: %f != %f\n", i, C_h[i], C_h_naive[i]);
-  //   }
-  // }
+  // Profile the performance of the tiled matrix multiplication over 10
+  // iterations.
+  profileMatmulKernel(A_d, B_d, C_d, m, n, k, grid_size, block_size, 10);
 
   free(A_h);
   free(B_h);
   free(C_h);
+  free(C_h_naive);
   cudaFree(A_d);
   cudaFree(B_d);
   cudaFree(C_d);
+  cudaFree(C_d_naive);
+
+  return 0;
 }
