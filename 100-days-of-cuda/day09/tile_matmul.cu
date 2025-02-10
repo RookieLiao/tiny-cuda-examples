@@ -4,22 +4,26 @@
 #define TILE_SIZE 16
 
 __global__ void naiveMatmulKernel(const float *A, const float *B, float *C,
-                                  int m, int n, int k) {
+                                  int m, int n, int k, int lda, int ldb,
+                                  int ldc) {
+  // operands A, B, C: row-major format
   int tx = threadIdx.x;
   int ty = threadIdx.y;
   int bx = blockIdx.x;
   int by = blockIdx.y;
 
-  int col = bx * blockDim.x + tx;
-  int row = by * blockDim.y + ty;
+  int x = bx * blockDim.x + tx;
+  int y = by * blockDim.y + ty;
 
-  if ((col < n) && (row < m)) {
+  if (x >= n || y >= m) {
+    return;
+  }
+
     float sum = 0.f;
     for (int i = 0; i < k; ++i) {
-      sum += (A[row * k + i] * B[i * n + col]);
-    }
-    C[row * n + col] = sum;
+    sum += (A[y * lda + i] * B[i * ldb + x]);
   }
+  C[y * ldc + x] = sum;
 }
 
 __global__ void tiledMatmulKernel(const float *A, const float *B, float *C,
