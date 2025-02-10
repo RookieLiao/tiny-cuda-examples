@@ -19,6 +19,7 @@
 | day6  | Matrix Multiplication - Naive implementation |
 | day7  | Matrix Multiplication - Tiled implementation |
 | day8  | Matrix Multiplication - Profiling |
+| day9  | Try to optimize tiled matmul according to this [blog](https://salykova.github.io/sgemm-gpu) and the result is not correct yet |
 
 
 #### How to load into PyTorch:
