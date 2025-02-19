@@ -21,6 +21,8 @@
 | day8  | Matrix Multiplication - Profiling |
 | day9  | Try to optimize tiled matmul according to this [blog](https://salykova.github.io/sgemm-gpu) and the result is not correct yet |
 
+test it
+
 
 #### How to load into PyTorch:
 1. **Implement CUDA Kernel**:
